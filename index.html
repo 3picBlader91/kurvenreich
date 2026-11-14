@@ -51,7 +51,7 @@ button:disabled{opacity:.4}
 .handle{padding:8px 0 4px;display:flex;justify-content:center;cursor:pointer}
 .handle span{width:42px;height:5px;border-radius:3px;background:#4a5160}
 .tabs{display:flex;gap:6px;padding:2px 12px 8px}
-.tabs button{flex:1;background:none;color:var(--muted);font-weight:650;padding:9px 4px}
+.tabs button{flex:1;background:none;color:var(--muted);font-weight:650;padding:9px 2px;font-size:14px}
 .tabs button.active{background:var(--panel2);color:var(--text)}
 .panels{overflow-y:auto;padding:0 14px 14px;-webkit-overflow-scrolling:touch}
 .field{margin:12px 0 4px}
@@ -80,7 +80,24 @@ input[type=range]{width:100%;accent-color:var(--acc)}
 .chip{background:var(--panel);font-size:13px;padding:7px 10px;white-space:nowrap;border:1.5px solid transparent}
 .chip.on{border-color:var(--acc)}
 .ractions{display:flex;gap:8px;margin-top:10px}
-.ractions button{flex:1;background:var(--panel)}
+.ractions button{flex:1;background:var(--panel);padding:10px 6px;font-size:14px}
+.ractions button.primary{flex:1.5}
+.inp{width:100%;font-size:16px;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);outline:none}
+.gcode{background:var(--panel2);border-radius:16px;padding:12px;text-align:center;margin-top:6px}
+.gcode small{display:block;color:var(--muted);font-size:12px}
+.gcode b{display:block;font-size:24px;letter-spacing:2px;margin:2px 0}
+.gcode span{font-size:13px;color:var(--muted)}
+.gcode span.on{color:var(--ok)}
+.mrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)}
+.mrow .dot{background:var(--c)}
+.mrow .mi{flex:1;min-width:0}.mrow .mi small{display:block;color:var(--muted);font-size:12.5px}
+.shared{background:var(--panel2);border-radius:14px;padding:10px 12px;margin-top:10px;display:flex;align-items:center;gap:10px}
+.mate{display:flex;flex-direction:column;align-items:center;width:44px}
+.mate-dot{position:relative;width:30px;height:30px;border-radius:50%;background:var(--c);border:3px solid #fff;color:#111;font-weight:800;font-size:13px;display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.mate-dot i{position:absolute;inset:-11px;pointer-events:none}
+.mate-dot i::before{content:'';position:absolute;left:50%;top:0;transform:translateX(-50%);border:6px solid transparent;border-bottom:9px solid var(--c);border-top:0}
+.mate span{margin-top:3px;background:rgba(15,17,21,.85);color:#fff;font-size:11px;font-weight:650;padding:1px 6px;border-radius:7px;white-space:nowrap}
+.mate.stale{opacity:.5}
 /* Touren */
 .tour{background:var(--panel2);border-radius:14px;padding:11px 12px;margin-top:8px}
 .tour .t1{display:flex;justify-content:space-between;gap:8px;font-weight:600}
@@ -99,6 +116,9 @@ body.driving .me svg{display:block}
 /* Fahrmodus */
 body.driving #sheet,body.driving #topbar,body.driving #btnLayers{display:none}
 body.driving #fabs{top:calc(var(--sat) + 140px)}
+body:not(.driving) #btnCompass{display:none}
+#btnCompass svg{transition:transform .4s}
+#btnCompass.on{box-shadow:0 0 0 2px var(--acc),0 4px 14px rgba(0,0,0,.35)}
 #navCard{position:fixed;top:calc(var(--sat) + 10px);left:10px;right:10px;z-index:1002;background:#17834f;color:#fff;border-radius:18px;padding:12px 14px;display:flex;gap:14px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.45)}
 #navArrow{width:58px;height:58px;flex:none;display:grid;place-items:center}
 #navArrow svg{width:56px;height:56px}
@@ -144,6 +164,7 @@ body.driving .leaflet-bottom.leaflet-right{bottom:calc(var(--sab) + 96px)}
 
 <div id="fabs">
   <button id="btnLayers" class="fab" aria-label="Kartenstil"><svg viewBox="0 0 24 24" fill="none" stroke="#eef1f5" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></button>
+  <button id="btnCompass" class="fab" aria-label="Kartenausrichtung"><svg viewBox="0 0 24 24"><path d="M12 2l4 10h-8z" fill="#ff4d3d"/><path d="M12 22l-4-10h8z" fill="#cfd5dd"/></svg></button>
   <button id="btnLocate" class="fab" aria-label="Mein Standort"><svg viewBox="0 0 24 24" fill="none" stroke="#3fa7ff" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
 </div>
 <div id="layerMenu" class="hidden">
@@ -158,6 +179,7 @@ body.driving .leaflet-bottom.leaflet-right{bottom:calc(var(--sab) + 96px)}
     <button data-tab="plan" class="active">Route</button>
     <button data-tab="loop">Rundtour</button>
     <button data-tab="tours">Touren</button>
+    <button data-tab="group">Gruppe</button>
   </div>
   <div class="panels">
     <div class="panel" id="panel-plan">
@@ -199,7 +221,28 @@ body.driving .leaflet-bottom.leaflet-right{bottom:calc(var(--sab) + 96px)}
         <input type="file" id="gpxFile" hidden>
       </div>
       <div id="tourList"></div>
-      <p class="note">Touren werden nur auf diesem Gerät im Browser gespeichert. Wichtiges am besten als GPX sichern.</p>
+      <p class="note">Touren werden nur auf diesem Gerät im Browser gespeichert. Wichtiges am besten als GPX sichern.<br>Version 1.3</p>
+    </div>
+
+    <div class="panel hidden" id="panel-group">
+      <div id="gOut">
+        <p class="hint">Gemeinsam fahren: Ihr seht euch gegenseitig live auf der Karte und könnt euch Routen schicken.</p>
+        <div class="field"><label>Dein Name (sehen die anderen)</label><input id="gName" class="inp" placeholder="Dein Name" maxlength="20" autocomplete="nickname"></div>
+        <button id="gCreate" class="primary wide">Gruppe erstellen</button>
+        <div class="field"><label>Oder mit Code beitreten</label>
+          <div class="row" style="margin:0"><input id="gCodeIn" class="inp grow" placeholder="XXXX-XXXX-XX" autocapitalize="characters" autocomplete="off"><button id="gJoin">Beitreten</button></div>
+        </div>
+      </div>
+      <div id="gIn" class="hidden">
+        <div class="gcode"><small>Gruppen-Code</small><b id="gCodeShow"></b><span id="gStatus">Verbinde…</span></div>
+        <button id="gInvite" class="primary wide">Freunde einladen</button>
+        <label class="toggle"><input type="checkbox" id="gShare"> Meinen Standort teilen</label>
+        <div id="gRoute"></div>
+        <div class="field"><label>Mitfahrer</label><div id="gList"></div></div>
+        <button id="gSendRoute" class="wide">Aktuelle Route an Gruppe senden</button>
+        <button id="gLeave" class="ghost wide">Gruppe verlassen</button>
+        <p class="note">Positionen werden verschlüsselt übertragen – nur wer den Code hat, kann sie sehen. Klappt, solange die App offen ist.</p>
+      </div>
     </div>
   </div>
 </div>
@@ -220,6 +263,8 @@ body.driving .leaflet-bottom.leaflet-right{bottom:calc(var(--sab) + 96px)}
 <div id="modal" class="hidden"><div class="mbox"><h3 id="mTitle"></h3><p id="mText"></p><input id="mInput"><div class="mbtns"><button id="mCancel"></button><button id="mOk" class="primary"></button></div></div></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
 <script>
 'use strict';
 /* ---------- Helfer ---------- */
@@ -307,7 +352,7 @@ function project(coords, cum, pt, i0 = 0, i1 = coords.length - 1) {
 const S = { tab: 'plan', mode: store.get('kr_mode', 'kurvig'), avoid: store.get('kr_avoid', true), wps: [], route: null, cands: [], here: null,
   loopStart: null, loopKm: 120, loopDir: 'zufall', loopMode: 'kurvig', active: null };
 
-const map = L.map('map', { zoomControl: false }).setView(store.get('kr_view', [51.1657, 10.4515, 6]).slice(0, 2), store.get('kr_view', [0, 0, 6])[2]);
+const map = L.map('map', { zoomControl: false, rotate: true, touchRotate: false, rotateControl: false, bearing: 0 }).setView(store.get('kr_view', [51.1657, 10.4515, 6]).slice(0, 2), store.get('kr_view', [0, 0, 6])[2]);
 const layers = {
   standard: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }),
   dunkel: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20, subdomains: 'abcd', attribution: '© OpenStreetMap © CARTO' }),
@@ -330,11 +375,67 @@ function drawHere(c) {
   if (!meMarker) meMarker = L.marker(ll, { icon: L.divIcon({ html: meHtml, className: '', iconSize: [40, 40], iconAnchor: [20, 20] }), interactive: false, zIndexOffset: 1000 }).addTo(map);
   else meMarker.setLatLng(ll);
 }
-function setMeHeading(h) { const el = meMarker && meMarker.getElement(); if (el && h != null) el.querySelector('svg').style.transform = `rotate(${h}deg)`; }
+function setMeHeading(h) { const el = meMarker && meMarker.getElement(); if (el && h != null) el.querySelector('svg').style.transform = `rotate(${h - mapRot}deg)`; }
+/* Kartendrehung: Fahrtrichtung oben / Norden oben */
+const canRotate = typeof map.setBearing === 'function';
+let rotSign = 1, mapRot = 0, headUp = store.get('kr_headup', true);
+if (canRotate) {
+  try { // Drehrichtung des Plugins einmal ermitteln
+    const c = map.getCenter(), o = map.latLngToContainerPoint(c);
+    map.setBearing(90); const p = map.latLngToContainerPoint(L.latLng(c.lat + 0.01, c.lng));
+    rotSign = p.x < o.x ? 1 : -1; map.setBearing(0);
+  } catch (e) { }
+}
+const lerpAngle = (a, b, t) => { const d = ((b - a + 540) % 360) - 180; return (a + d * t + 360) % 360; };
+function setMapRot(deg) {
+  mapRot = ((deg % 360) + 360) % 360;
+  if (canRotate) { try { map.setBearing(rotSign * mapRot); } catch (e) { } }
+  const b = $('#btnCompass'); b.querySelector('svg').style.transform = `rotate(${-mapRot}deg)`; b.classList.toggle('on', headUp);
+}
+$('#btnCompass').onclick = () => {
+  if (!canRotate) { toast('Kartendrehung konnte nicht geladen werden – App neu laden'); return; }
+  enableCompass();
+  headUp = !headUp; store.set('kr_headup', headUp); toast(headUp ? 'Fahrtrichtung oben' : 'Norden oben');
+  const ses2 = S.active;
+  setMapRot(headUp && ses2 && ses2.viewHdg != null ? ses2.viewHdg : 0);
+  if (ses2) setMeHeading(ses2.heading);
+};
+/* iPhone-Kompass: Richtung auch im Stand */
+let compassHdg = null, lastCompassApply = 0, compassOn = false;
+function onOrient(e) {
+  let h = null;
+  if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) h = e.webkitCompassHeading;
+  else if (e.absolute && e.alpha != null) h = 360 - e.alpha;
+  if (h == null) return;
+  compassHdg = h; const ses = S.active; if (!ses) return;
+  if ((ses.speed || 0) > 4 && ses.gpsHdgTime && Date.now() - ses.gpsHdgTime < 4000) return; // beim Fahren gilt GPS
+  const now = Date.now(); if (now - lastCompassApply < 200) return; lastCompassApply = now;
+  ses.heading = h; ses.viewHdg = ses.viewHdg == null ? h : lerpAngle(ses.viewHdg, h, 0.35);
+  if (headUp && canRotate && ses.follow) setMapRot(ses.viewHdg);
+  setMeHeading(h);
+}
+function enableCompass() {
+  if (compassOn || !window.DeviceOrientationEvent) return;
+  const add = () => { compassOn = true; window.addEventListener('deviceorientation', onOrient); window.addEventListener('deviceorientationabsolute', onOrient); };
+  try {
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') DeviceOrientationEvent.requestPermission().then(r => { if (r === 'granted') add(); }).catch(() => { });
+    else add();
+  } catch (e) { }
+}
+function followView(ses, pt) {
+  const z = Math.max(map.getZoom(), 12);
+  let center = pt;
+  if (ses.heading != null && (ses.speed || 0) > 4) { // Blick nach vorne: eigener Pfeil im unteren Bildschirmdrittel
+    const mpp = 156543.03 * Math.cos(toRad(pt[0])) / Math.pow(2, z);
+    center = destPoint(pt, headUp && canRotate ? (ses.viewHdg ?? ses.heading) : ses.heading, mpp * window.innerHeight * 0.2);
+  }
+  map.setView(center, z, { animate: true });
+}
 function onPos(p) {
   const c = p.coords; S.here = [c.latitude, c.longitude]; drawHere(c);
   if (centerOnFix) { centerOnFix = false; map.setView(S.here, Math.max(map.getZoom(), 14)); }
   if (S.active) S.active.onPos(p);
+  G.lastSpd = c.speed != null && c.speed >= 0 ? c.speed * 3.6 : 0; gPublishPos(false);
 }
 function startWatch() {
   if (watchId !== null) return;
@@ -350,7 +451,7 @@ function getHere() {
   });
 }
 $('#btnLocate').onclick = () => {
-  if (S.active) { S.active.follow = true; if (S.here) map.setView(S.here, Math.max(map.getZoom(), 16)); return; }
+  if (S.active) { S.active.follow = true; if (S.here) followView(S.active, S.here); return; }
   startWatch(); if (S.here) map.setView(S.here, Math.max(map.getZoom(), 14)); else centerOnFix = true;
 };
 
@@ -541,7 +642,7 @@ function fitRoute(r) { map.fitBounds(L.latLngBounds(r.coords), { paddingTopLeft:
 function setRoute(r, fit) { if (!r) return; S.route = r; r.stats = r.stats || analyze(r.coords); drawRoute(r); if (fit) fitRoute(r); renderResult(); }
 function clearRoute() { S.route = null; S.cands = []; routeLayer.clearLayers(); renderResult(); }
 function renderResult() {
-  const r = S.route; $('#planResult').innerHTML = ''; $('#loopResult').innerHTML = '';
+  const r = S.route; if ($('#gSendRoute')) $('#gSendRoute').disabled = !r; $('#planResult').innerHTML = ''; $('#loopResult').innerHTML = '';
   if (!r) return;
   const box = r.src === 'loop' ? $('#loopResult') : $('#planResult');
   const chips = S.cands.length > 1 ? `<div class="chips">${S.cands.map((c, i) => `<button class="chip ${c === r ? 'on' : ''}" data-c="${i}">Variante ${i + 1} · ${fmtKm(c.distance)} · ${'★'.repeat(c.stats.rating)}</button>`).join('')}</div>` : '';
@@ -549,21 +650,23 @@ function renderResult() {
     ${r.name ? `<div style="font-weight:650;margin-bottom:8px">${esc(r.name)}</div>` : ''}
     <div class="rstats"><div><b>${fmtKm(r.distance)}</b><small>Strecke</small></div><div><b>${fmtDur(r.duration)}</b><small>Fahrzeit</small></div><div><b class="stars">${stars(r.stats.rating)}</b><small>Kurvigkeit</small></div></div>
     ${chips}
-    <div class="ractions"><button class="primary" data-act="go">▶ Losfahren</button><button data-act="save">Speichern</button><button data-act="gpx">GPX</button></div></div>`;
+    <div class="ractions"><button class="primary" data-act="go">▶ Losfahren</button><button data-act="save">Speichern</button><button data-act="share">Teilen</button><button data-act="gpx">GPX</button></div></div>`;
   box.querySelectorAll('[data-c]').forEach(b => b.onclick = () => setRoute(S.cands[+b.dataset.c], false));
   box.querySelector('[data-act=go]').onclick = () => startSession(true);
   box.querySelector('[data-act=save]').onclick = savePlanned;
+  box.querySelector('[data-act=share]').onclick = shareRouteLink;
   box.querySelector('[data-act=gpx]').onclick = () => shareGpx(r.name || (r.src === 'loop' ? 'Rundtour' : 'Route') + ' ' + fmtKm(r.distance), r.coords);
 }
 
 /* ---------- Tabs & Sheet ---------- */
 function switchTab(t) {
   S.tab = t; $$('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
-  ['plan', 'loop', 'tours'].forEach(p => $('#panel-' + p).classList.toggle('hidden', p !== t));
+  ['plan', 'loop', 'tours', 'group'].forEach(p => $('#panel-' + p).classList.toggle('hidden', p !== t));
   $('#sheet').classList.remove('collapsed');
   t === 'plan' ? wpLayer.addTo(map) : map.removeLayer(wpLayer);
   t === 'loop' ? loopLayer.addTo(map) : map.removeLayer(loopLayer);
   if (t === 'tours') renderTours();
+  if (t === 'group') renderGroup();
 }
 $$('.tabs button').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
 $('#handle').onclick = () => $('#sheet').classList.toggle('collapsed');
@@ -640,7 +743,7 @@ function prepNav(ses, r) {
 function startSession(withNav) {
   if (S.active) return;
   if (withNav && !S.route) return;
-  startWatch(); requestWake();
+  enableCompass(); startWatch(); requestWake();
   const ses = { nav: withNav, rec: new Recorder(), off: 0, follow: true, speed: 0, rerouting: false, lastReroute: 0 };
   if (withNav) prepNav(ses, S.route);
   ses.onPos = p => sessionPos(ses, p);
@@ -651,6 +754,7 @@ function startSession(withNav) {
   $('#navBLbl').textContent = withNav ? 'Ankunft' : 'Zeit';
   if (withNav) { $('#navDist').textContent = '…'; $('#navText').textContent = 'Warte auf GPS-Signal'; $('#navArrow').innerHTML = arrowSvg(null); }
   speak(withNav ? 'Los geht\'s. Gute Fahrt!' : 'Aufzeichnung gestartet');
+  setMapRot(0);
   if (S.here) map.setView(S.here, 16);
   ses.timer = setInterval(() => updateHud(ses), 1000); updateHud(ses);
 }
@@ -659,8 +763,11 @@ function sessionPos(ses, p) {
   ses.rec.add(p); const c = p.coords, pt = [c.latitude, c.longitude];
   if (c.speed != null && c.speed >= 0) ses.speed = c.speed * 3.6;
   let h = c.heading; if ((h == null || isNaN(h)) && ses.lastPt && dist(ses.lastPt, pt) > 6) h = bearing(ses.lastPt, pt);
-  if (h != null && !isNaN(h)) ses.heading = h; ses.lastPt = pt; setMeHeading(ses.heading);
-  if (ses.follow) map.setView(pt, Math.max(map.getZoom(), 15), { animate: true });
+  if (h != null && !isNaN(h) && ((ses.speed || 0) > 4 || compassHdg == null)) { ses.heading = h; ses.gpsHdgTime = Date.now(); } ses.lastPt = pt;
+  if (ses.heading != null && (ses.speed || 0) > 4) ses.viewHdg = ses.viewHdg == null ? ses.heading : lerpAngle(ses.viewHdg, ses.heading, 0.6);
+  if (headUp && canRotate && ses.follow && ses.viewHdg != null) setMapRot(ses.viewHdg);
+  setMeHeading(ses.heading);
+  if (ses.follow) followView(ses, pt);
   if (ses.nav && !ses.arrived) navUpdate(ses, pt, c.accuracy);
   updateHud(ses);
 }
@@ -710,7 +817,7 @@ $('#navStop').onclick = async () => {
   const ses = S.active; if (!ses) return;
   if (!await modal({ title: 'Fahrt beenden?', ok: 'Beenden', danger: true })) return;
   clearInterval(ses.timer); S.active = null; releaseWake(); document.body.classList.remove('driving'); $('#nav').classList.add('hidden');
-  setMeHeading(0); const rec = ses.rec; map.removeLayer(rec.line);
+  setMapRot(0); setMeHeading(0); const rec = ses.rec; map.removeLayer(rec.line);
   if (rec.pts.length > 5 && rec.dist > 300) {
     const sec = (Date.now() - rec.t0) / 1000;
     const name = await modal({ title: 'Tour speichern?', text: `${fmtKm(rec.dist)} in ${fmtDur(sec)} · max. ${Math.round(rec.max)} km/h`, input: 'Tour vom ' + new Date().toLocaleDateString('de-DE'), ok: 'Speichern', cancel: 'Verwerfen' });
@@ -780,8 +887,195 @@ $('#gpxFile').onchange = async e => {
   } catch (err) { toast('Datei konnte nicht gelesen werden'); }
 };
 
+/* ---------- Route per Link teilen ---------- */
+const b64u = {
+  enc: s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+  dec: s => decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/'))))
+};
+const appUrl = () => location.origin + location.pathname;
+function routeSharePts(r) {
+  let pts = r.pts && r.pts.length >= 2 ? r.pts : null;
+  if (!pts) { const c = r.coords, n = Math.min(25, Math.max(2, Math.round(r.distance / 5000))); pts = []; for (let i = 0; i < n; i++) pts.push(c[Math.round(i * (c.length - 1) / (n - 1))]); }
+  if (pts.length > 25) { const k = []; for (let i = 0; i < 25; i++) k.push(pts[Math.round(i * (pts.length - 1) / 24)]); pts = k; }
+  return pts.map(p => [+p[0].toFixed(5), +p[1].toFixed(5)]);
+}
+function routePayload(r) { return { n: r.name || (r.src === 'loop' ? 'Rundtour' : 'Route') + ' ' + fmtKm(r.distance), p: routeSharePts(r), a: S.avoid }; }
+async function shareText(title, url) {
+  if (navigator.share) { try { await navigator.share({ title, text: title, url }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  try { await navigator.clipboard.writeText(url); toast('Link kopiert'); } catch (e) { await modal({ title: 'Link zum Teilen', text: url, ok: 'OK', cancel: 'Schließen' }); }
+}
+async function shareRouteLink() {
+  const r = S.route; if (!r) return; const pl = routePayload(r);
+  await shareText('Motorrad-Route: ' + pl.n, appUrl() + '#r=' + b64u.enc(JSON.stringify(pl)));
+}
+async function loadSharedRoute(pl) {
+  busy(true, 'Lade geteilte Route…');
+  try {
+    const [rt] = await osrm(pl.p, { exclude: typeof pl.a === 'boolean' ? pl.a : S.avoid });
+    rt.name = pl.n; rt.src = 'shared'; rt.stats = analyze(rt.coords);
+    S.cands = []; if (S.tab !== 'plan') switchTab('plan'); setRoute(rt, true); toast('Route geladen: ' + pl.n);
+  } catch (e) { toast('Route konnte nicht geladen werden'); }
+  finally { busy(false); }
+}
+
+/* ---------- Gruppenfahrt (Live-Standorte, verschlüsselt über MQTT) ---------- */
+const BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
+const G = { code: store.get('kr_gcode', null), name: store.get('kr_name', ''), share: store.get('kr_gshare', true),
+  id: store.get('kr_id', null), clients: [], key: null, topic: null, members: new Map(), lastPub: 0, lastSpd: 0, seen: new Set(), sharedRoute: null };
+if (!G.id) { G.id = Math.random().toString(36).slice(2, 10); store.set('kr_id', G.id); }
+const te = new TextEncoder(), td = new TextDecoder();
+const sha = async s => new Uint8Array(await crypto.subtle.digest('SHA-256', te.encode(s)));
+const hex = a => [...a].map(b => b.toString(16).padStart(2, '0')).join('');
+const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function newCode() { const r = crypto.getRandomValues(new Uint8Array(10)); const s = [...r].map(b => CODE_ABC[b % 32]).join(''); return `${s.slice(0, 4)}-${s.slice(4, 8)}-${s.slice(8)}`; }
+function normCode(s) { const c = String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); return c.length === 10 ? `${c.slice(0, 4)}-${c.slice(4, 8)}-${c.slice(8)}` : null; }
+async function gSetup(code) {
+  G.topic = 'kurvenreich/v1/' + hex(await sha('topic:' + code)).slice(0, 32);
+  G.key = await crypto.subtle.importKey('raw', await sha('key:' + code), 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+async function gEnc(obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, G.key, te.encode(JSON.stringify(obj))));
+  const out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12); return out;
+}
+async function gDec(buf) { const u = new Uint8Array(buf); return JSON.parse(td.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: u.slice(0, 12) }, G.key, u.slice(12)))); }
+const gConnected = () => G.clients.some(c => c.connected);
+async function gConnect() {
+  if (!window.mqtt || !window.crypto || !crypto.subtle) { toast('Gruppenfunktion nicht verfügbar – Internet prüfen und App neu laden'); return; }
+  gDisconnect(); await gSetup(G.code);
+  G.clients = BROKERS.map(url => {
+    const c = mqtt.connect(url, { clientId: 'kr_' + G.id + '_' + Math.random().toString(36).slice(2, 6), clean: true, reconnectPeriod: 4000, connectTimeout: 10000, keepalive: 30 });
+    c.on('connect', () => { c.subscribe(G.topic + '/#'); renderGroupStatus(); gPublishPos(true); });
+    c.on('message', (t, msg) => gOnMessage(msg));
+    c.on('close', renderGroupStatus); c.on('offline', renderGroupStatus); c.on('error', () => { });
+    return c;
+  });
+  G.hb = setInterval(() => { gPublishPos(true); gPrune(); }, 15000);
+  if (G.share) startWatch();
+  renderGroup();
+}
+function gDisconnect() { clearInterval(G.hb); G.clients.forEach(c => { try { c.end(true); } catch (e) { } }); G.clients = []; }
+async function gPublish(sub, obj, retain = false) {
+  if (!G.key || !gConnected()) return;
+  const payload = await gEnc({ ...obj, id: G.id, name: G.name, mid: Math.random().toString(36).slice(2, 12), t: Date.now() });
+  G.clients.forEach(c => { if (c.connected) c.publish(G.topic + '/' + sub, payload, { qos: 0, retain }); });
+}
+function gPublishPos(force) {
+  if (!G.code || !G.share || !S.here) return;
+  const now = Date.now(); if (!force && now - G.lastPub < 4000) return; G.lastPub = now;
+  const ses = S.active;
+  gPublish('pos', { type: 'pos', lat: +S.here[0].toFixed(6), lng: +S.here[1].toFixed(6), spd: Math.round(ses ? ses.speed || 0 : G.lastSpd || 0), hdg: ses && ses.heading != null ? Math.round(ses.heading) : null });
+}
+async function gOnMessage(msg) {
+  let m; try { m = await gDec(msg); } catch (e) { return; }
+  if (!m || !m.mid || G.seen.has(m.mid)) return;
+  G.seen.add(m.mid); if (G.seen.size > 600) G.seen = new Set([...G.seen].slice(-300));
+  if (m.id === G.id) return;
+  if (m.type === 'pos') updateMember(m);
+  else if (m.type === 'bye') removeMember(m.id);
+  else if (m.type === 'route' && m.route && Date.now() - m.t < 2 * 86400000) {
+    G.sharedRoute = m; renderGroup();
+    if (store.get('kr_lastroute', '') === m.mid) return;
+    store.set('kr_lastroute', m.mid);
+    if (S.active) { toast(`${m.name || 'Jemand'} hat eine Route geteilt – nach der Fahrt unter „Gruppe“`); return; }
+    if (await modal({ title: `${m.name || 'Jemand'} hat eine Route geteilt`, text: m.route.n, ok: 'Anzeigen', cancel: 'Später' })) loadSharedRoute(m.route);
+  }
+}
+const colorFor = id => { let h = 0; for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 360; return `hsl(${h},85%,58%)`; };
+function memberIcon(m) {
+  const stale = Date.now() - m.seen > 60000;
+  return L.divIcon({ className: '', iconSize: [44, 52], iconAnchor: [22, 18],
+    html: `<div class="mate ${stale ? 'stale' : ''}" style="--c:${colorFor(m.id)}"><div class="mate-dot">${esc((m.name || '?').charAt(0).toUpperCase())}${m.hdg != null ? `<i style="transform:rotate(${m.hdg - mapRot}deg)"></i>` : ''}</div><span>${esc(m.name || 'Fahrer')}</span></div>` });
+}
+function updateMember(msg) {
+  let m = G.members.get(msg.id);
+  if (!m) { m = { id: msg.id }; G.members.set(msg.id, m); toast(`${msg.name || 'Ein Fahrer'} ist in der Gruppe`); }
+  Object.assign(m, { name: msg.name, lat: msg.lat, lng: msg.lng, spd: msg.spd, hdg: msg.hdg, seen: Date.now() });
+  if (!m.marker) m.marker = L.marker([m.lat, m.lng], { icon: memberIcon(m), zIndexOffset: 900 }).addTo(map).on('click', () => map.setView([m.lat, m.lng], 15));
+  else { m.marker.setLatLng([m.lat, m.lng]); m.marker.setIcon(memberIcon(m)); }
+  renderGroupList();
+}
+function removeMember(id) { const m = G.members.get(id); if (!m) return; if (m.marker) map.removeLayer(m.marker); G.members.delete(id); renderGroupList(); }
+function gPrune() { [...G.members.values()].forEach(m => { if (Date.now() - m.seen > 600000) removeMember(m.id); else if (m.marker) m.marker.setIcon(memberIcon(m)); }); renderGroupList(); }
+function ago(t) { const s = Math.round((Date.now() - t) / 1000); return s < 10 ? 'gerade eben' : s < 60 ? `vor ${s} s` : `vor ${Math.round(s / 60)} min`; }
+
+function renderGroupStatus() {
+  const el = $('#gStatus'); if (!el) return; const on = gConnected();
+  el.textContent = on ? `● verbunden${G.share ? ' · dein Standort wird geteilt' : ''}` : 'Verbinde…'; el.classList.toggle('on', on);
+}
+function renderGroupList() {
+  const el = $('#gList'); if (!el) return;
+  const ms = [...G.members.values()];
+  el.innerHTML = ms.length ? ms.map(m => `<div class="mrow" style="--c:${colorFor(m.id)}"><span class="dot">${esc((m.name || '?').charAt(0).toUpperCase())}</span>
+      <div class="mi">${esc(m.name || 'Fahrer')}<small>${m.spd != null ? m.spd + ' km/h · ' : ''}${S.here ? fmtKm(dist(S.here, [m.lat, m.lng])) + ' entfernt · ' : ''}${ago(m.seen)}</small></div>
+      <button class="small" data-m="${esc(m.id)}">Zeigen</button></div>`).join('')
+    : '<p class="hint">Noch niemand da. Tippe auf „Freunde einladen“ und schick den Link.</p>';
+  el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { const m = G.members.get(b.dataset.m); if (m) { map.setView([m.lat, m.lng], 15); $('#sheet').classList.add('collapsed'); } });
+}
+function renderGroup() {
+  const inG = !!G.code;
+  $('#gOut').classList.toggle('hidden', inG); $('#gIn').classList.toggle('hidden', !inG);
+  $('#gName').value = G.name; $('#gShare').checked = G.share;
+  if (inG) { $('#gCodeShow').textContent = G.code; renderGroupStatus(); renderGroupList(); }
+  $('#gSendRoute').disabled = !S.route;
+  const sr = G.sharedRoute;
+  $('#gRoute').innerHTML = sr ? `<div class="shared"><div class="grow">Route von <b>${esc(sr.name || 'Mitfahrer')}</b><br><small style="color:var(--muted)">${esc(sr.route.n)}</small></div><button class="small primary" id="gOpenRoute">Anzeigen</button></div>` : '';
+  if (sr) $('#gOpenRoute').onclick = () => loadSharedRoute(sr.route);
+}
+async function askName() {
+  let n = ($('#gName').value || G.name || '').trim();
+  if (!n) n = (await modal({ title: 'Wie heißt du?', text: 'Diesen Namen sehen die anderen auf der Karte.', input: '', ok: 'Weiter' }) || '').trim();
+  if (!n) { toast('Bitte einen Namen eingeben'); return null; }
+  G.name = n.slice(0, 20); store.set('kr_name', G.name); return G.name;
+}
+async function gEnter(code) {
+  if (!await askName()) return;
+  G.code = code; store.set('kr_gcode', code); G.sharedRoute = null;
+  await gConnect(); if (S.tab !== 'group') switchTab('group');
+}
+async function gJoinFlow(code) {
+  if (G.code === code) { switchTab('group'); return; }
+  if (G.code && !await modal({ title: 'Gruppe wechseln?', text: `Du bist schon in Gruppe ${G.code}.`, ok: 'Wechseln' })) return;
+  if (G.code) await gLeave(true);
+  await gEnter(code); toast('Gruppe beigetreten');
+}
+async function gLeave(silent) {
+  try { await gPublish('pos', { type: 'bye' }); } catch (e) { }
+  await sleep(300); gDisconnect();
+  G.members.forEach(m => m.marker && map.removeLayer(m.marker)); G.members.clear();
+  G.code = null; G.key = null; G.sharedRoute = null; store.set('kr_gcode', null);
+  if (!silent) { renderGroup(); toast('Gruppe verlassen'); }
+}
+$('#gCreate').onclick = async () => { await gEnter(newCode()); };
+$('#gJoin').onclick = () => { const c = normCode($('#gCodeIn').value); if (!c) { toast('Der Code hat 10 Zeichen, z. B. K7QM-4RTX-9P'); return; } gJoinFlow(c); };
+$('#gName').onchange = () => { G.name = $('#gName').value.trim().slice(0, 20); store.set('kr_name', G.name); };
+$('#gInvite').onclick = () => shareText(`Fahr mit mir! Gruppen-Code ${G.code}`, appUrl() + '#g=' + G.code.replace(/-/g, ''));
+$('#gShare').onchange = async () => {
+  G.share = $('#gShare').checked; store.set('kr_gshare', G.share);
+  if (G.share) { startWatch(); gPublishPos(true); } else await gPublish('pos', { type: 'bye' });
+  renderGroupStatus();
+};
+$('#gSendRoute').onclick = async () => {
+  if (!S.route) { toast('Erst eine Route planen oder anzeigen'); return; }
+  if (!gConnected()) { toast('Noch nicht verbunden – kurz warten'); return; }
+  await gPublish('route', { type: 'route', route: routePayload(S.route) }, true); toast('Route an die Gruppe gesendet ✓');
+};
+$('#gLeave').onclick = async () => { if (await modal({ title: 'Gruppe verlassen?', ok: 'Verlassen', danger: true })) gLeave(false); };
+setInterval(() => { if (G.code && S.tab === 'group') renderGroupList(); }, 5000);
+
+/* ---------- Links beim Öffnen ---------- */
+function handleHash() {
+  const h = location.hash; if (!h || h.length < 4) return;
+  try { history.replaceState(null, '', location.pathname); } catch (e) { }
+  if (h.startsWith('#r=')) { try { const pl = JSON.parse(b64u.dec(h.slice(3))); if (pl.p && pl.p.length >= 2) loadSharedRoute(pl); else throw 0; } catch (e) { toast('Ungültiger Routen-Link'); } }
+  else if (h.startsWith('#g=')) { const c = normCode(h.slice(3)); if (c) gJoinFlow(c); else toast('Ungültiger Gruppen-Link'); }
+}
+window.addEventListener('hashchange', handleHash);
+
 /* ---------- Start ---------- */
 renderWps();
+if (G.code) gConnect();
+handleHash();
 if (window.speechSynthesis) speechSynthesis.getVoices();
 if (location.protocol === 'file:') toast('Tipp: Für GPS muss die App über https geöffnet werden');
 </script>
