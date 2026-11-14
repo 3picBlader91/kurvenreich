@@ -26,7 +26,7 @@ button:disabled{opacity:.4}
 .wide{width:100%;margin-top:10px;padding:13px}
 .grow{flex:1}
 .hidden{display:none!important}
-.row{display:flex;gap:8px;align-items:center;margin:8px 0}
+.row{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap}
 .hint,.note{color:var(--muted);font-size:13.5px;margin:6px 2px}
 /* Suche */
 #topbar{position:fixed;top:calc(var(--sat) + 10px);left:12px;right:12px;z-index:1001}
@@ -35,7 +35,13 @@ button:disabled{opacity:.4}
 .search button{background:none;color:var(--muted);padding:8px 10px}
 #results{margin-top:6px;background:var(--panel);border-radius:14px;overflow:hidden;max-height:50vh;overflow-y:auto;box-shadow:0 6px 20px rgba(0,0,0,.4)}
 #results:empty{display:none}
-.res{padding:11px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+.res{padding:10px 8px 10px 12px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;align-items:center;gap:10px}
+.res .ico{width:22px;text-align:center;flex:none}
+.res .rt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.res .star{background:none;color:var(--acc);padding:6px 9px;font-size:18px;flex:none}
+.res.hintrow{color:var(--muted);font-size:13.5px;cursor:default}
+.qhead{padding:9px 14px 5px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
+.qhead button{background:none;color:var(--acc);padding:0;font-size:12px;text-transform:none}
 .res:last-child{border-bottom:0}
 .res small{display:block;color:var(--muted)}
 /* FABs */
@@ -186,7 +192,8 @@ body.driving .leaflet-bottom.leaflet-right{bottom:calc(var(--sab) + 96px)}
       <div id="wpList"></div>
       <div class="row">
         <button id="btnHereStart" class="small">📍 Standort als Start</button>
-        <button id="btnClear" class="small ghost">Alles löschen</button>
+        <button id="btnHome" class="small hidden">🏠 Nach Hause</button>
+        <button id="btnClear" class="small ghost">Leeren</button>
       </div>
       <div class="field"><label>Routenstil</label>
         <div class="seg" id="planMode"><button data-v="schnell">Schnell</button><button data-v="kurvig">Kurvig</button><button data-v="extra">Extra kurvig</button></div>
@@ -221,7 +228,7 @@ body.driving .leaflet-bottom.leaflet-right{bottom:calc(var(--sab) + 96px)}
         <input type="file" id="gpxFile" hidden>
       </div>
       <div id="tourList"></div>
-      <p class="note">Touren werden nur auf diesem Gerät im Browser gespeichert. Wichtiges am besten als GPX sichern.<br>Version 1.3</p>
+      <p class="note">Touren werden nur auf diesem Gerät im Browser gespeichert. Wichtiges am besten als GPX sichern.<br>Version 1.4</p>
     </div>
 
     <div class="panel hidden" id="panel-group">
@@ -464,19 +471,23 @@ function fmtPlace(p) {
 let searchT, searchSeq = 0;
 $('#q').addEventListener('input', () => {
   const q = $('#q').value.trim(); $('#qclear').classList.toggle('hidden', !q); clearTimeout(searchT);
-  if (q.length < 3) { $('#results').innerHTML = ''; return; }
+  if (q.length < 3) { showQuick(); return; }
   searchT = setTimeout(() => search(q), 350);
 });
 $('#q').addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(searchT); search($('#q').value.trim()); } });
-$('#qclear').onclick = () => { $('#q').value = ''; $('#results').innerHTML = ''; $('#qclear').classList.add('hidden'); };
+$('#qclear').onclick = () => { $('#q').value = ''; $('#qclear').classList.add('hidden'); showQuick(); $('#q').focus(); };
+$('#q').addEventListener('focus', () => { if ($('#q').value.trim().length < 3) showQuick(); });
+document.addEventListener('pointerdown', e => { if (!e.target.closest('#topbar') && !e.target.closest('#modal')) $('#results').innerHTML = ''; });
 async function search(q) {
   if (!q) return; const seq = ++searchSeq; const c = map.getCenter();
   try {
     const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=de&limit=6&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}`);
     const j = await r.json(); if (seq !== searchSeq) return;
     if (!j.features || !j.features.length) { $('#results').innerHTML = '<div class="res">Nichts gefunden</div>'; return; }
-    $('#results').innerHTML = j.features.map((f, i) => { const p = fmtPlace(f.properties); return `<div class="res" data-i="${i}">${esc(p[0] || 'Ort')}<small>${esc(p.slice(1).join(', '))}</small></div>`; }).join('');
-    $$('#results .res').forEach(el => el.onclick = () => { const f = j.features[+el.dataset.i]; const [lng, lat] = f.geometry.coordinates; choosePlace(lat, lng, fmtPlace(f.properties).slice(0, 2).join(', ')); });
+    const place = f => { const [lng, lat] = f.geometry.coordinates; return { lat, lng, label: fmtPlace(f.properties).slice(0, 2).join(', ') }; };
+    $('#results').innerHTML = j.features.map((f, i) => { const p = fmtPlace(f.properties); return resRow('📍', p[0] || 'Ort', p.slice(1).join(', '), `data-i="${i}"`, `<button class="star" data-star="${i}" aria-label="Als Favorit speichern">☆</button>`); }).join('');
+    $$('#results [data-i]').forEach(el => el.onclick = () => { const p = place(j.features[+el.dataset.i]); choosePlace(p.lat, p.lng, p.label); });
+    $$('#results [data-star]').forEach(b => b.onclick = e => { e.stopPropagation(); saveFav(place(j.features[+b.dataset.star])); });
   } catch (e) { $('#results').innerHTML = '<div class="res">Suche gerade nicht erreichbar</div>'; }
 }
 async function reverse(obj, after) {
@@ -486,13 +497,62 @@ async function reverse(obj, after) {
     if (f) { obj.label = fmtPlace(f.properties).slice(0, 2).join(', ') || obj.label; after && after(); }
   } catch (e) { }
 }
-function choosePlace(lat, lng, label) {
+function choosePlace(lat, lng, label, isFav) {
+  if (!isFav) addHist({ lat, lng, label });
   $('#results').innerHTML = ''; $('#q').blur(); $('#q').value = label; $('#qclear').classList.remove('hidden');
   if (S.tab === 'loop') { setLoopStart(lat, lng, label); map.setView([lat, lng], 11); return; }
   if (S.tab !== 'plan') switchTab('plan');
   if (!S.wps.length && S.here) S.wps.push({ lat: S.here[0], lng: S.here[1], label: 'Mein Standort' });
   addWp(lat, lng, label); fitWps();
 }
+
+/* ---------- Favoriten & Verlauf ---------- */
+const favIcon = k => k === 'home' ? '🏠' : k === 'work' ? '💼' : '⭐';
+const getFavs = () => store.get('kr_favs', []), getHist = () => store.get('kr_hist', []);
+function resRow(ico, title, sub, attrs, extra = '') { return `<div class="res" ${attrs}><span class="ico">${ico}</span><div class="rt">${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</div>${extra}</div>`; }
+function addHist(p) {
+  if (!p.label || p.label === 'Mein Standort') return;
+  const hs = getHist().filter(x => x.label !== p.label);
+  hs.unshift({ label: p.label, lat: +p.lat.toFixed(6), lng: +p.lng.toFixed(6) }); store.set('kr_hist', hs.slice(0, 10));
+}
+async function saveFav(p) {
+  const def = (p.label || '').replace(/^🏠 |^💼 |^⭐ /, '').split(',')[0];
+  const n = await modal({ title: 'Als Favorit speichern', text: 'Tipp: „Zuhause“ und „Arbeit“ bekommen eigene Symbole.', input: def, ok: 'Speichern' });
+  if (!n) return;
+  const lc = n.toLowerCase().trim();
+  const kind = /^(zuhause|zu hause|home|daheim)$/.test(lc) ? 'home' : /^(arbeit|work|büro|buero)$/.test(lc) ? 'work' : 'fav';
+  const order = { home: 0, work: 1, fav: 2 };
+  let favs = getFavs(); if (kind !== 'fav') favs = favs.filter(f => f.kind !== kind);
+  favs.push({ id: Date.now(), name: n, label: p.label || n, lat: +p.lat.toFixed(6), lng: +p.lng.toFixed(6), kind });
+  favs.sort((a, b) => order[a.kind] - order[b.kind]); store.set('kr_favs', favs);
+  toast(`${favIcon(kind)} ${n} gespeichert`); renderHomeBtn();
+  if ($('#results').innerHTML && $('#q').value.trim().length < 3) showQuick();
+}
+function showQuick() {
+  const favs = getFavs(), hist = getHist(); let html = '<div class="qhead"><span>Favoriten</span></div>';
+  html += favs.length ? favs.map((f, i) => resRow(favIcon(f.kind), f.name, f.label !== f.name ? f.label : '', `data-fav="${i}"`, `<button class="star" data-favdel="${i}" aria-label="Löschen" style="color:var(--muted);font-size:15px">✕</button>`)).join('')
+    : '<div class="res hintrow">Suche einen Ort und tippe auf ☆, um ihn zu speichern – z. B. als „Zuhause“.</div>';
+  if (hist.length) html += '<div class="qhead"><span>Zuletzt gesucht</span><button id="histClear">Verlauf löschen</button></div>' +
+    hist.map((x, i) => { const parts = x.label.split(', '); return resRow('🕘', parts[0], parts.slice(1).join(', '), `data-hist="${i}"`, `<button class="star" data-histfav="${i}" aria-label="Als Favorit">☆</button>`); }).join('');
+  const el = $('#results'); el.innerHTML = html;
+  el.querySelectorAll('[data-fav]').forEach(r => r.onclick = () => { const f = favs[+r.dataset.fav]; choosePlace(f.lat, f.lng, favIcon(f.kind) + ' ' + f.name, true); });
+  el.querySelectorAll('[data-favdel]').forEach(b => b.onclick = async e => {
+    e.stopPropagation(); const f = favs[+b.dataset.favdel];
+    if (await modal({ title: 'Favorit löschen?', text: f.name, ok: 'Löschen', danger: true })) { store.set('kr_favs', getFavs().filter(x => x.id !== f.id)); renderHomeBtn(); showQuick(); }
+  });
+  el.querySelectorAll('[data-hist]').forEach(r => r.onclick = () => { const x = hist[+r.dataset.hist]; choosePlace(x.lat, x.lng, x.label); });
+  el.querySelectorAll('[data-histfav]').forEach(b => b.onclick = e => { e.stopPropagation(); saveFav(hist[+b.dataset.histfav]); });
+  const hc = $('#histClear'); if (hc) hc.onclick = e => { e.stopPropagation(); store.set('kr_hist', []); showQuick(); };
+}
+function renderHomeBtn() { $('#btnHome').classList.toggle('hidden', !getFavs().some(f => f.kind === 'home')); }
+$('#btnHome').onclick = async () => {
+  const home = getFavs().find(f => f.kind === 'home'); if (!home) return;
+  try {
+    busy(true, 'Suche Standort…'); const here = await getHere(); busy(false);
+    S.wps = [{ lat: here[0], lng: here[1], label: 'Mein Standort' }, { lat: home.lat, lng: home.lng, label: '🏠 ' + home.name }];
+    clearRoute(); renderWps(); fitWps(); planRoute();
+  } catch (e) { busy(false); toast(e.message); }
+};
 
 /* ---------- Wegpunkte ---------- */
 function wpKind(i) { return i === 0 ? 'start' : (i === S.wps.length - 1 ? 'end' : 'via'); }
@@ -507,9 +567,10 @@ function renderWps() {
 }
 function renderWpList() {
   const el = $('#wpList');
-  el.innerHTML = S.wps.length ? S.wps.map((w, i) => `<div class="wprow"><span class="dot dot-${wpKind(i)}">${wpLbl(i)}</span><span class="wplabel">${esc(w.label)}</span><button class="icon" data-del="${i}" aria-label="Entfernen">✕</button></div>`).join('')
+  el.innerHTML = S.wps.length ? S.wps.map((w, i) => `<div class="wprow"><span class="dot dot-${wpKind(i)}">${wpLbl(i)}</span><span class="wplabel">${esc(w.label)}</span><button class="icon" data-wfav="${i}" aria-label="Als Favorit" style="color:var(--acc)">☆</button><button class="icon" data-del="${i}" aria-label="Entfernen">✕</button></div>`).join('')
     : '<p class="hint">Tippe auf die Karte oder suche oben einen Ort.<br>1. Punkt = Start, 2. = Ziel, weitere = Zwischenziele. Punkte lassen sich verschieben.</p>';
   el.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { S.wps.splice(+b.dataset.del, 1); clearRoute(); renderWps(); });
+  el.querySelectorAll('[data-wfav]').forEach(b => b.onclick = () => { const w = S.wps[+b.dataset.wfav]; if (w) saveFav(w); });
   $('#btnCalc').disabled = S.wps.length < 2;
 }
 function addWp(lat, lng, label) {
@@ -1073,7 +1134,7 @@ function handleHash() {
 window.addEventListener('hashchange', handleHash);
 
 /* ---------- Start ---------- */
-renderWps();
+renderWps(); renderHomeBtn();
 if (G.code) gConnect();
 handleHash();
 if (window.speechSynthesis) speechSynthesis.getVoices();
