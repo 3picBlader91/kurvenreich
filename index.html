@@ -11,7 +11,7 @@
 <title>Kurvenreich</title>
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.png">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
 :root{--bg:#14171c;--panel:#1d2128;--panel2:#272c35;--line:#333a46;--text:#eef1f5;--muted:#9aa3b2;--acc:#ff5a1f;--blue:#3fa7ff;--ok:#2ecc71;--danger:#ff4d5e;--sat:env(safe-area-inset-top);--sab:env(safe-area-inset-bottom)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -148,12 +148,11 @@ body:not(.driving) #btnCompass{display:none}
 .mbox p:empty{display:none}
 .mbox input{width:100%;font-size:16px;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);outline:none;margin:4px 0 12px}
 .mbtns{display:flex;gap:8px}.mbtns button{flex:1}
-/* Leaflet */
-.leaflet-control-attribution{font-size:10px;background:rgba(20,23,28,.7)!important;color:#bbb!important;border-radius:6px 0 0 0}
-.leaflet-control-attribution a{color:#ddd!important}
-.leaflet-bottom.leaflet-right{bottom:calc(var(--sab) + 120px)}
-body.driving .leaflet-bottom.leaflet-right{bottom:calc(var(--sab) + 96px)}
-.leaflet-div-icon{background:none;border:0}
+/* MapLibre */
+.maplibregl-ctrl-bottom-right{bottom:calc(var(--sab) + 120px)}
+body.driving .maplibregl-ctrl-bottom-right{bottom:calc(var(--sab) + 96px)}
+.maplibregl-ctrl-attrib{font-size:10px}
+.maplibregl-marker{cursor:pointer}
 </style>
 </head>
 <body>
@@ -175,6 +174,7 @@ body.driving .leaflet-bottom.leaflet-right{bottom:calc(var(--sab) + 96px)}
 </div>
 <div id="layerMenu" class="hidden">
   <button data-layer="standard">Standard</button>
+  <button data-layer="hell">Hell</button>
   <button data-layer="dunkel">Dunkel</button>
   <button data-layer="topo">Gelände</button>
 </div>
@@ -228,7 +228,7 @@ body.driving .leaflet-bottom.leaflet-right{bottom:calc(var(--sab) + 96px)}
         <input type="file" id="gpxFile" hidden>
       </div>
       <div id="tourList"></div>
-      <p class="note">Touren werden nur auf diesem Gerät im Browser gespeichert. Wichtiges am besten als GPX sichern.<br>Version 1.4</p>
+      <p class="note">Touren werden nur auf diesem Gerät im Browser gespeichert. Wichtiges am besten als GPX sichern.<br>Version 2.0 · Karte: OpenFreeMap / OpenStreetMap</p>
     </div>
 
     <div class="panel hidden" id="panel-group">
@@ -269,8 +269,7 @@ body.driving .leaflet-bottom.leaflet-right{bottom:calc(var(--sab) + 96px)}
 <div id="toast"></div>
 <div id="modal" class="hidden"><div class="mbox"><h3 id="mTitle"></h3><p id="mText"></p><input id="mInput"><div class="mbtns"><button id="mCancel"></button><button id="mOk" class="primary"></button></div></div></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
 <script>
 'use strict';
@@ -359,53 +358,88 @@ function project(coords, cum, pt, i0 = 0, i1 = coords.length - 1) {
 const S = { tab: 'plan', mode: store.get('kr_mode', 'kurvig'), avoid: store.get('kr_avoid', true), wps: [], route: null, cands: [], here: null,
   loopStart: null, loopKm: 120, loopDir: 'zufall', loopMode: 'kurvig', active: null };
 
-const map = L.map('map', { zoomControl: false, rotate: true, touchRotate: false, rotateControl: false, bearing: 0 }).setView(store.get('kr_view', [51.1657, 10.4515, 6]).slice(0, 2), store.get('kr_view', [0, 0, 6])[2]);
-const layers = {
-  standard: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }),
-  dunkel: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20, subdomains: 'abcd', attribution: '© OpenStreetMap © CARTO' }),
-  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, subdomains: 'abc', attribution: '© OpenStreetMap © OpenTopoMap' })
+/* Karte: MapLibre (Vektorkarten von OpenFreeMap, Daten © OpenStreetMap) */
+const STYLES = {
+  standard: 'https://tiles.openfreemap.org/styles/liberty',
+  hell: 'https://tiles.openfreemap.org/styles/positron',
+  dunkel: 'https://tiles.openfreemap.org/styles/dark',
+  topo: { version: 8, sources: { t: { type: 'raster', tiles: ['a', 'b', 'c'].map(s => `https://${s}.tile.opentopomap.org/{z}/{x}/{y}.png`), tileSize: 256, maxzoom: 17, attribution: '© OpenStreetMap-Mitwirkende, SRTM | © OpenTopoMap (CC-BY-SA)' } }, layers: [{ id: 't', type: 'raster', source: 't' }] }
 };
-let curLayer = store.get('kr_layer', 'standard'); if (!layers[curLayer]) curLayer = 'standard';
-layers[curLayer].addTo(map);
-function setLayer(n) { map.removeLayer(layers[curLayer]); curLayer = n; layers[n].addTo(map); store.set('kr_layer', n); $$('#layerMenu button').forEach(b => b.classList.toggle('on', b.dataset.layer === n)); }
+const DARK_FALLBACK = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+let curLayer = store.get('kr_layer', 'standard'); if (!STYLES[curLayer]) curLayer = 'standard';
+const v0 = store.get('kr_view', [51.1657, 10.4515, 6]);
+if (!window.maplibregl) document.body.insertAdjacentHTML('afterbegin', '<div style="position:fixed;inset:0;z-index:3000;display:grid;place-items:center;padding:30px;text-align:center;background:#14171c">Karte konnte nicht geladen werden. Bitte Internetverbindung prüfen und die App neu öffnen.</div>');
+const map = new maplibregl.Map({ container: 'map', style: STYLES[curLayer], center: [v0[1], v0[0]], zoom: v0[2], attributionControl: false, dragRotate: false, pitchWithRotate: false, maxPitch: 60, fadeDuration: 150 });
+map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+map.touchZoomRotate.disableRotation(); if (map.touchPitch) map.touchPitch.disable();
+const llToLngLat = ll => [ll[1], ll[0]];
+map.setView = (ll, z, o = {}) => map.easeTo({ center: llToLngLat(ll), zoom: z ?? map.getZoom(), duration: o.animate === false ? 0 : 600 });
+function boundsOf(coords) { const b = new maplibregl.LngLatBounds(); coords.forEach(c => b.extend([c[1], c[0]])); return b; }
+function fitCoords(coords, pad = {}) {
+  if (!coords.length) return;
+  try { map.fitBounds(boundsOf(coords), { padding: { top: pad.top ?? 80, bottom: pad.bottom ?? sheetH() + 20, left: pad.left ?? 30, right: pad.right ?? 30 }, maxZoom: 15, duration: 700 }); } catch (e) { }
+}
+/* Linien (Route, aufgezeichnete Spur) – werden nach Kartenstil-Wechsel neu angelegt */
+const lines = { route: [], track: [] };
+const geo = c => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: c.map(llToLngLat) }, properties: {} });
+function addOverlays() {
+  if (!map.getSource('route')) {
+    map.addSource('route', { type: 'geojson', data: geo(lines.route) });
+    map.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#6b1a00', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 5, 12, 9, 17, 16], 'line-opacity': .9 } });
+    map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#ff5a1f', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 3, 12, 5.5, 17, 10] } });
+  }
+  if (!map.getSource('track')) {
+    map.addSource('track', { type: 'geojson', data: geo(lines.track) });
+    map.addLayer({ id: 'track-line', type: 'line', source: 'track', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#3fa7ff', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 2.5, 17, 7], 'line-opacity': .9 } });
+  }
+}
+function setLine(id, coords) { lines[id] = coords; const s = map.getSource(id); if (s) s.setData(geo(coords)); }
+let styleOk = false;
+map.on('style.load', () => { styleOk = true; addOverlays(); });
+function setLayer(n) {
+  curLayer = n; store.set('kr_layer', n); styleOk = false; map.setStyle(STYLES[n]);
+  if (n === 'dunkel') setTimeout(() => { if (!styleOk && curLayer === 'dunkel') map.setStyle(DARK_FALLBACK); }, 6000);
+  $$('#layerMenu button').forEach(b => b.classList.toggle('on', b.dataset.layer === n));
+}
+if (curLayer === 'dunkel') setTimeout(() => { if (!styleOk && curLayer === 'dunkel') map.setStyle(DARK_FALLBACK); }, 6000);
 $$('#layerMenu button').forEach(b => { b.classList.toggle('on', b.dataset.layer === curLayer); b.onclick = () => { setLayer(b.dataset.layer); $('#layerMenu').classList.add('hidden'); }; });
 $('#btnLayers').onclick = () => $('#layerMenu').classList.toggle('hidden');
 map.on('moveend', () => { if (!S.active) { const c = map.getCenter(); store.set('kr_view', [c.lat, c.lng, map.getZoom()]); } });
-
-const wpLayer = L.layerGroup().addTo(map), routeLayer = L.layerGroup().addTo(map), loopLayer = L.layerGroup().addTo(map);
+/* Marker als HTML-Elemente */
+function mkMarker(ll, html, { draggable = false, z = 1 } = {}) {
+  const el = document.createElement('div'); el.innerHTML = html; el.style.zIndex = z;
+  return new maplibregl.Marker({ element: el, draggable, anchor: 'center' }).setLngLat(llToLngLat(ll)).addTo(map);
+}
+class Group {
+  constructor() { this.items = []; this.visible = true; }
+  add(m) { this.items.push(m); if (!this.visible) m.getElement().style.display = 'none'; return m; }
+  clearLayers() { this.items.forEach(m => m.remove()); this.items = []; }
+  show(v) { this.visible = v; this.items.forEach(m => m.getElement().style.display = v ? '' : 'none'); }
+}
+const wpLayer = new Group(), loopLayer = new Group();
 
 /* ---------- Standort ---------- */
-let meMarker = null, watchId = null, centerOnFix = false;
+let meMarker = null, watchId = null, centerOnFix = false, meHdg = null;
 const meHtml = '<div class="me"><div class="dot" style="border-radius:50%"></div><svg viewBox="0 0 24 24"><path d="M12 2l7.5 19-7.5-4.2L4.5 21z" fill="#3fa7ff" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg></div>';
 function drawHere(c) {
   const ll = [c.latitude, c.longitude];
-  if (!meMarker) meMarker = L.marker(ll, { icon: L.divIcon({ html: meHtml, className: '', iconSize: [40, 40], iconAnchor: [20, 20] }), interactive: false, zIndexOffset: 1000 }).addTo(map);
-  else meMarker.setLatLng(ll);
+  if (!meMarker) meMarker = mkMarker(ll, meHtml, { z: 10 }); else meMarker.setLngLat(llToLngLat(ll));
 }
-function setMeHeading(h) { const el = meMarker && meMarker.getElement(); if (el && h != null) el.querySelector('svg').style.transform = `rotate(${h - mapRot}deg)`; }
+function setMeHeading(h) { if (h != null) meHdg = h; const el = meMarker && meMarker.getElement(); if (el && meHdg != null) el.querySelector('svg').style.transform = `rotate(${meHdg - map.getBearing()}deg)`; }
 /* Kartendrehung: Fahrtrichtung oben / Norden oben */
-const canRotate = typeof map.setBearing === 'function';
-let rotSign = 1, mapRot = 0, headUp = store.get('kr_headup', true);
-if (canRotate) {
-  try { // Drehrichtung des Plugins einmal ermitteln
-    const c = map.getCenter(), o = map.latLngToContainerPoint(c);
-    map.setBearing(90); const p = map.latLngToContainerPoint(L.latLng(c.lat + 0.01, c.lng));
-    rotSign = p.x < o.x ? 1 : -1; map.setBearing(0);
-  } catch (e) { }
-}
+const canRotate = true;
+let mapRot = 0, headUp = store.get('kr_headup', true);
 const lerpAngle = (a, b, t) => { const d = ((b - a + 540) % 360) - 180; return (a + d * t + 360) % 360; };
-function setMapRot(deg) {
-  mapRot = ((deg % 360) + 360) % 360;
-  if (canRotate) { try { map.setBearing(rotSign * mapRot); } catch (e) { } }
-  const b = $('#btnCompass'); b.querySelector('svg').style.transform = `rotate(${-mapRot}deg)`; b.classList.toggle('on', headUp);
-}
+const navPitch = () => (S.active && headUp ? 45 : 0);
+function updateCompassBtn() { const b = $('#btnCompass'); b.querySelector('svg').style.transform = `rotate(${-map.getBearing()}deg)`; b.classList.toggle('on', headUp); }
+map.on('rotate', () => { setMeHeading(); updateCompassBtn(); });
+map.on('rotateend', () => { if (typeof G !== 'undefined') G.members.forEach(m => m.marker && (m.marker.getElement().innerHTML = memberIcon(m))); });
+function setMapRot(deg, dur = 400) { mapRot = ((deg % 360) + 360) % 360; map.easeTo({ bearing: mapRot, pitch: navPitch(), duration: dur }); updateCompassBtn(); }
 $('#btnCompass').onclick = () => {
-  if (!canRotate) { toast('Kartendrehung konnte nicht geladen werden – App neu laden'); return; }
   enableCompass();
   headUp = !headUp; store.set('kr_headup', headUp); toast(headUp ? 'Fahrtrichtung oben' : 'Norden oben');
   const ses2 = S.active;
   setMapRot(headUp && ses2 && ses2.viewHdg != null ? ses2.viewHdg : 0);
-  if (ses2) setMeHeading(ses2.heading);
 };
 /* iPhone-Kompass: Richtung auch im Stand */
 let compassHdg = null, lastCompassApply = 0, compassOn = false;
@@ -416,9 +450,9 @@ function onOrient(e) {
   if (h == null) return;
   compassHdg = h; const ses = S.active; if (!ses) return;
   if ((ses.speed || 0) > 4 && ses.gpsHdgTime && Date.now() - ses.gpsHdgTime < 4000) return; // beim Fahren gilt GPS
-  const now = Date.now(); if (now - lastCompassApply < 200) return; lastCompassApply = now;
+  const now = Date.now(); if (now - lastCompassApply < 250) return; lastCompassApply = now;
   ses.heading = h; ses.viewHdg = ses.viewHdg == null ? h : lerpAngle(ses.viewHdg, h, 0.35);
-  if (headUp && canRotate && ses.follow) setMapRot(ses.viewHdg);
+  if (headUp && ses.follow) setMapRot(ses.viewHdg, 240);
   setMeHeading(h);
 }
 function enableCompass() {
@@ -431,12 +465,12 @@ function enableCompass() {
 }
 function followView(ses, pt) {
   const z = Math.max(map.getZoom(), 12);
-  let center = pt;
-  if (ses.heading != null && (ses.speed || 0) > 4) { // Blick nach vorne: eigener Pfeil im unteren Bildschirmdrittel
-    const mpp = 156543.03 * Math.cos(toRad(pt[0])) / Math.pow(2, z);
-    center = destPoint(pt, headUp && canRotate ? (ses.viewHdg ?? ses.heading) : ses.heading, mpp * window.innerHeight * 0.2);
-  }
-  map.setView(center, z, { animate: true });
+  const bearing = headUp ? (ses.viewHdg ?? map.getBearing()) : 0;
+  const moving = ses.heading != null && (ses.speed || 0) > 4, d = Math.round(window.innerHeight * 0.2);
+  let offset = [0, headUp ? d : 0];
+  if (moving) { const rel = toRad(ses.heading - bearing); offset = [-Math.sin(rel) * d, Math.cos(rel) * d]; } // eigener Pfeil unten, Blick nach vorne
+  mapRot = bearing;
+  map.easeTo({ center: llToLngLat(pt), zoom: z, bearing, pitch: navPitch(), offset, duration: 900, easing: t => t });
 }
 function onPos(p) {
   const c = p.coords; S.here = [c.latitude, c.longitude]; drawHere(c);
@@ -560,8 +594,8 @@ function wpLbl(i) { const k = wpKind(i); return k === 'start' ? 'A' : k === 'end
 function renderWps() {
   wpLayer.clearLayers();
   S.wps.forEach((w, i) => {
-    const m = L.marker([w.lat, w.lng], { icon: L.divIcon({ className: '', html: `<div class="wp wp-${wpKind(i)}">${wpLbl(i)}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] }), draggable: true }).addTo(wpLayer);
-    m.on('dragend', e => { const ll = e.target.getLatLng(); w.lat = ll.lat; w.lng = ll.lng; w.label = 'Punkt auf Karte'; clearRoute(); renderWpList(); reverse(w, renderWpList); });
+    const m = wpLayer.add(mkMarker([w.lat, w.lng], `<div class="wp wp-${wpKind(i)}">${wpLbl(i)}</div>`, { draggable: true, z: 5 }));
+    m.on('dragend', () => { const ll = m.getLngLat(); w.lat = ll.lat; w.lng = ll.lng; w.label = 'Punkt auf Karte'; clearRoute(); renderWpList(); reverse(w, renderWpList); });
   });
   renderWpList();
 }
@@ -578,7 +612,7 @@ function addWp(lat, lng, label) {
   if (S.wps.length >= 2) S.wps.splice(S.wps.length - 1, 0, w); else S.wps.push(w);
   clearRoute(); renderWps(); if (!label) reverse(w, renderWpList);
 }
-function fitWps() { if (S.wps.length > 1) map.fitBounds(L.latLngBounds(S.wps.map(w => [w.lat, w.lng])), { padding: [60, 60], paddingBottomRight: [0, sheetH()] }); else if (S.wps.length) map.setView([S.wps[0].lat, S.wps[0].lng], 12); }
+function fitWps() { if (S.wps.length > 1) fitCoords(S.wps.map(w => [w.lat, w.lng]), { top: 90, left: 50, right: 50 }); else if (S.wps.length) map.setView([S.wps[0].lat, S.wps[0].lng], 12); }
 function sheetH() { return $('#sheet').offsetHeight; }
 $('#btnHereStart').onclick = async () => {
   try { busy(true, 'Suche Standort…'); const h = await getHere(); busy(false);
@@ -652,7 +686,7 @@ $('#btnCalc').onclick = planRoute;
 function setLoopStart(lat, lng, label, rev) {
   S.loopStart = { lat, lng, label: label || 'Punkt auf Karte' };
   loopLayer.clearLayers();
-  L.marker([lat, lng], { icon: L.divIcon({ className: '', html: '<div class="wp wp-start">⟲</div>', iconSize: [28, 28], iconAnchor: [14, 14] }) }).addTo(loopLayer);
+  loopLayer.add(mkMarker([lat, lng], '<div class="wp wp-start">⟲</div>', { z: 5 }));
   $('#loopStartLabel').textContent = S.loopStart.label;
   if (rev) reverse(S.loopStart, () => $('#loopStartLabel').textContent = S.loopStart.label);
 }
@@ -695,13 +729,11 @@ $('#btnLoop').onclick = planLoop;
 
 /* ---------- Route anzeigen ---------- */
 function drawRoute(r) {
-  routeLayer.clearLayers();
-  L.polyline(r.coords, { color: '#6b1a00', weight: 10, opacity: .85, interactive: false }).addTo(routeLayer);
-  L.polyline(r.coords, { color: '#ff5a1f', weight: 6, interactive: false }).addTo(routeLayer);
+  setLine('route', r.coords);
 }
-function fitRoute(r) { map.fitBounds(L.latLngBounds(r.coords), { paddingTopLeft: [30, 80], paddingBottomRight: [30, sheetH() + 20] }); }
+function fitRoute(r) { fitCoords(r.coords); }
 function setRoute(r, fit) { if (!r) return; S.route = r; r.stats = r.stats || analyze(r.coords); drawRoute(r); if (fit) fitRoute(r); renderResult(); }
-function clearRoute() { S.route = null; S.cands = []; routeLayer.clearLayers(); renderResult(); }
+function clearRoute() { S.route = null; S.cands = []; setLine('route', []); renderResult(); }
 function renderResult() {
   const r = S.route; if ($('#gSendRoute')) $('#gSendRoute').disabled = !r; $('#planResult').innerHTML = ''; $('#loopResult').innerHTML = '';
   if (!r) return;
@@ -724,17 +756,17 @@ function switchTab(t) {
   S.tab = t; $$('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
   ['plan', 'loop', 'tours', 'group'].forEach(p => $('#panel-' + p).classList.toggle('hidden', p !== t));
   $('#sheet').classList.remove('collapsed');
-  t === 'plan' ? wpLayer.addTo(map) : map.removeLayer(wpLayer);
-  t === 'loop' ? loopLayer.addTo(map) : map.removeLayer(loopLayer);
+  wpLayer.show(t === 'plan'); loopLayer.show(t === 'loop');
   if (t === 'tours') renderTours();
   if (t === 'group') renderGroup();
 }
 $$('.tabs button').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
 $('#handle').onclick = () => $('#sheet').classList.toggle('collapsed');
 map.on('click', e => {
+  const tg = e.originalEvent && e.originalEvent.target; if (tg && tg.closest && tg.closest('.maplibregl-marker')) return;
   if (S.active) return; $('#results').innerHTML = ''; $('#layerMenu').classList.add('hidden');
-  if (S.tab === 'plan') addWp(e.latlng.lat, e.latlng.lng);
-  else if (S.tab === 'loop') setLoopStart(e.latlng.lat, e.latlng.lng, 'Punkt auf Karte', true);
+  if (S.tab === 'plan') addWp(e.lngLat.lat, e.lngLat.lng);
+  else if (S.tab === 'loop') setLoopStart(e.lngLat.lat, e.lngLat.lng, 'Punkt auf Karte', true);
 });
 
 /* ---------- Sprache & Display ---------- */
@@ -781,12 +813,12 @@ function arrowSvg(st) {
 
 /* ---------- Fahren: Navigation + Aufzeichnung ---------- */
 class Recorder {
-  constructor() { this.pts = []; this.t0 = Date.now(); this.dist = 0; this.max = 0; this.line = L.polyline([], { color: '#3fa7ff', weight: 4, opacity: .9, interactive: false }).addTo(map); }
+  constructor() { this.pts = []; this.t0 = Date.now(); this.dist = 0; this.max = 0; this.line = []; setLine('track', []); }
   add(p) {
     const c = p.coords; if (c.accuracy > 50) return;
     const pt = [c.latitude, c.longitude], last = this.pts[this.pts.length - 1];
     if (last) { const d = dist(last, pt); if (d < 8) return; this.dist += d; }
-    this.pts.push([+pt[0].toFixed(6), +pt[1].toFixed(6), Math.round((p.timestamp || Date.now()) / 1000)]); this.line.addLatLng(pt);
+    this.pts.push([+pt[0].toFixed(6), +pt[1].toFixed(6), Math.round((p.timestamp || Date.now()) / 1000)]); this.line.push(pt); setLine('track', this.line);
     const sp = (c.speed ?? 0) * 3.6; if (sp > this.max && sp < 320) this.max = sp;
   }
 }
@@ -826,7 +858,6 @@ function sessionPos(ses, p) {
   let h = c.heading; if ((h == null || isNaN(h)) && ses.lastPt && dist(ses.lastPt, pt) > 6) h = bearing(ses.lastPt, pt);
   if (h != null && !isNaN(h) && ((ses.speed || 0) > 4 || compassHdg == null)) { ses.heading = h; ses.gpsHdgTime = Date.now(); } ses.lastPt = pt;
   if (ses.heading != null && (ses.speed || 0) > 4) ses.viewHdg = ses.viewHdg == null ? ses.heading : lerpAngle(ses.viewHdg, ses.heading, 0.6);
-  if (headUp && canRotate && ses.follow && ses.viewHdg != null) setMapRot(ses.viewHdg);
   setMeHeading(ses.heading);
   if (ses.follow) followView(ses, pt);
   if (ses.nav && !ses.arrived) navUpdate(ses, pt, c.accuracy);
@@ -878,7 +909,7 @@ $('#navStop').onclick = async () => {
   const ses = S.active; if (!ses) return;
   if (!await modal({ title: 'Fahrt beenden?', ok: 'Beenden', danger: true })) return;
   clearInterval(ses.timer); S.active = null; releaseWake(); document.body.classList.remove('driving'); $('#nav').classList.add('hidden');
-  setMapRot(0); setMeHeading(0); const rec = ses.rec; map.removeLayer(rec.line);
+  setMapRot(0); const rec = ses.rec; setLine('track', []);
   if (rec.pts.length > 5 && rec.dist > 300) {
     const sec = (Date.now() - rec.t0) / 1000;
     const name = await modal({ title: 'Tour speichern?', text: `${fmtKm(rec.dist)} in ${fmtDur(sec)} · max. ${Math.round(rec.max)} km/h`, input: 'Tour vom ' + new Date().toLocaleDateString('de-DE'), ok: 'Speichern', cancel: 'Verwerfen' });
@@ -1045,19 +1076,20 @@ async function gOnMessage(msg) {
 const colorFor = id => { let h = 0; for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 360; return `hsl(${h},85%,58%)`; };
 function memberIcon(m) {
   const stale = Date.now() - m.seen > 60000;
-  return L.divIcon({ className: '', iconSize: [44, 52], iconAnchor: [22, 18],
-    html: `<div class="mate ${stale ? 'stale' : ''}" style="--c:${colorFor(m.id)}"><div class="mate-dot">${esc((m.name || '?').charAt(0).toUpperCase())}${m.hdg != null ? `<i style="transform:rotate(${m.hdg - mapRot}deg)"></i>` : ''}</div><span>${esc(m.name || 'Fahrer')}</span></div>` });
+  return (`<div class="mate ${stale ? 'stale' : ''}" style="--c:${colorFor(m.id)}"><div class="mate-dot">${esc((m.name || '?').charAt(0).toUpperCase())}${m.hdg != null ? `<i style="transform:rotate(${m.hdg - map.getBearing()}deg)"></i>` : ''}</div><span>${esc(m.name || 'Fahrer')}</span></div>`);
 }
 function updateMember(msg) {
   let m = G.members.get(msg.id);
   if (!m) { m = { id: msg.id }; G.members.set(msg.id, m); toast(`${msg.name || 'Ein Fahrer'} ist in der Gruppe`); }
   Object.assign(m, { name: msg.name, lat: msg.lat, lng: msg.lng, spd: msg.spd, hdg: msg.hdg, seen: Date.now() });
-  if (!m.marker) m.marker = L.marker([m.lat, m.lng], { icon: memberIcon(m), zIndexOffset: 900 }).addTo(map).on('click', () => map.setView([m.lat, m.lng], 15));
-  else { m.marker.setLatLng([m.lat, m.lng]); m.marker.setIcon(memberIcon(m)); }
+  if (!m.marker) {
+    m.marker = mkMarker([m.lat, m.lng], memberIcon(m), { z: 9 });
+    m.marker.getElement().addEventListener('click', ev => { ev.stopPropagation(); if (S.active) S.active.follow = false; map.setView([m.lat, m.lng], 15); });
+  } else { m.marker.setLngLat([m.lng, m.lat]); m.marker.getElement().innerHTML = memberIcon(m); }
   renderGroupList();
 }
-function removeMember(id) { const m = G.members.get(id); if (!m) return; if (m.marker) map.removeLayer(m.marker); G.members.delete(id); renderGroupList(); }
-function gPrune() { [...G.members.values()].forEach(m => { if (Date.now() - m.seen > 600000) removeMember(m.id); else if (m.marker) m.marker.setIcon(memberIcon(m)); }); renderGroupList(); }
+function removeMember(id) { const m = G.members.get(id); if (!m) return; if (m.marker) m.marker.remove(); G.members.delete(id); renderGroupList(); }
+function gPrune() { [...G.members.values()].forEach(m => { if (Date.now() - m.seen > 600000) removeMember(m.id); else if (m.marker) m.marker.getElement().innerHTML = memberIcon(m); }); renderGroupList(); }
 function ago(t) { const s = Math.round((Date.now() - t) / 1000); return s < 10 ? 'gerade eben' : s < 60 ? `vor ${s} s` : `vor ${Math.round(s / 60)} min`; }
 
 function renderGroupStatus() {
@@ -1103,7 +1135,7 @@ async function gJoinFlow(code) {
 async function gLeave(silent) {
   try { await gPublish('pos', { type: 'bye' }); } catch (e) { }
   await sleep(300); gDisconnect();
-  G.members.forEach(m => m.marker && map.removeLayer(m.marker)); G.members.clear();
+  G.members.forEach(m => m.marker && m.marker.remove()); G.members.clear();
   G.code = null; G.key = null; G.sharedRoute = null; store.set('kr_gcode', null);
   if (!silent) { renderGroup(); toast('Gruppe verlassen'); }
 }
